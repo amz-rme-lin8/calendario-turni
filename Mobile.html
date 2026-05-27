@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>I Miei Turni — LIN8 RME</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{touch-action:manipulation}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a202c;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+.header{background:linear-gradient(135deg,#232f3e,#37475a);color:#fff;padding:14px 20px;display:flex;align-items:center;position:relative;min-height:56px}
+.header-left{flex-shrink:0;font-size:.9rem;font-weight:700;letter-spacing:1px;z-index:1}
+.header-center{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
+.header-center h1{font-size:1.2rem;font-weight:700;letter-spacing:.5px}
+.header-right{text-align:right;flex-shrink:0;font-size:.78rem;line-height:1.4;margin-left:auto;z-index:1}
+.header-right .hdr-day{font-weight:700;font-size:.82rem}
+.header-right .hdr-week{opacity:.85;font-size:.72rem}
+
+.login-section{padding:14px 20px;background:#fff;border-bottom:1px solid #e2e8f0}
+.login-select{width:100%;padding:12px 16px;border:2px solid #e2e8f0;border-radius:10px;font-size:1rem;color:#1a202c;background:#fff;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.login-select:focus{outline:none;border-color:#ff9900;box-shadow:0 0 0 3px rgba(255,153,0,.2)}
+.dark-toggle{width:44px;height:44px;border-radius:10px;border:2px solid #e2e8f0;background:#fff;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.dark-toggle:hover{background:#f1f5f9}
+
+/* Dark mode */
+body.dark{background:#121212;color:#e0e0e0}
+body.dark .header{background:linear-gradient(135deg,#1a1a1a,#2d2d2d)}
+body.dark .login-section{background:#1e1e1e;border-color:#333}
+body.dark .login-select{background:#2a2a2a;color:#e0e0e0;border-color:#444}
+body.dark .dark-toggle{background:#2a2a2a;border-color:#444;color:#fbbf24}
+body.dark .calendar-container{background:#121212}
+body.dark .month-block{background:#262626;border-color:#333}
+body.dark .month-header{background:#0d0d0d}
+body.dark .cal-grid{background:#333}
+body.dark .cal-day{background:#262626}
+body.dark .cal-day.empty{background:#1a1a1a}
+body.dark .cal-day .day-num{color:#aaa}
+body.dark .cal-day.weekend .day-num{color:#666}
+body.dark .cal-day-header{background:#1a1a1a;color:#999}
+body.dark .cal-wk{background:#1a1a1a;color:#8b5cf6}
+body.dark .note-popup{background:#1e1e1e;border-color:#dc2626}
+body.dark .note-popup .note-date{color:#e0e0e0}
+body.dark .note-popup .note-text{color:#aaa}
+body.dark .note-popup .note-close{color:#aaa}
+body.dark #whoContent>div>div:last-child{color:#e0e0e0 !important}
+body.dark .loading-bar{color:#fbbf24}
+body.dark .empty-state{color:#666}
+body.dark .empty-state h2{color:#999}
+
+.tech-info-bar{display:none}
+.legend-compact{display:none !important}
+
+.calendar-container{padding:8px;flex:1;display:flex;flex-direction:column;overflow:hidden}
+.month-block{background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;flex:1;display:flex;flex-direction:column}
+.month-header{background:#232f3e;color:#fff;padding:14px 16px;font-size:1.1rem;font-weight:700;text-align:center;display:flex;align-items:center;justify-content:space-between}
+.month-header .month-title{flex:1;text-align:center;cursor:pointer}
+.month-nav{background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;padding:4px 12px;border-radius:6px;opacity:.8}
+.month-nav:hover{opacity:1;background:rgba(255,255,255,.1)}
+.cal-grid{display:grid;grid-template-columns:24px repeat(7,1fr);gap:1px;background:#e2e8f0;flex:1}
+.cal-day-header{background:#f8fafc;padding:6px 4px;text-align:center;font-size:.85rem;font-weight:800;color:#475569}
+.cal-wk{background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:#8b5cf6}
+.cal-day{background:#fff;text-align:center;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 2px;min-height:0}
+.cal-day.has-shift{padding:4px 2px}
+.cal-day.empty{background:#fafafa}
+.cal-day.today{outline:2px solid #ff9900;outline-offset:-2px}
+.cal-day.weekend .day-num{color:#94a3b8}
+.cal-day .day-num{font-size:.7rem;color:#64748b;font-weight:600;margin-bottom:4px}
+.cal-day .shift-badge{display:flex;align-items:center;justify-content:center;width:90%;padding:3px 1px;border-radius:5px;font-size:.82rem;font-weight:700;letter-spacing:.3px;white-space:nowrap;text-align:center;min-height:22px}
+.cal-day .shift-badge.small-text{font-size:.52rem;padding:3px 0;width:100%;min-height:22px}
+.cal-day .note-indicator{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#dc2626}
+.note-popup{display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid #dc2626;padding:14px 20px;z-index:200;box-shadow:0 -4px 20px rgba(0,0,0,.15);border-radius:14px 14px 0 0}
+.note-popup.show{display:block}
+.note-popup .note-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.note-popup .note-date{font-weight:700;font-size:.9rem;color:#232f3e}
+.note-popup .note-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:#64748b;padding:4px 8px}
+.note-popup .note-text{font-size:.88rem;color:#475569;line-height:1.5}
+.s-M{background:#c6efce;color:#1b5e20}
+.s-P{background:#fff2cc;color:#7c5e00}
+.s-N{background:#bdd7ee;color:#0d47a1}
+.s-C{background:#d9d9d9;color:#424242}
+.s-F{background:#ffc7ce;color:#b71c1c}
+.s-T{background:#fff9c4;color:#795548}
+.s-MAL{background:#f8bbd0;color:#880e4f}
+.s-TRAS{background:#e1bee7;color:#4a148c}
+
+.legend-compact{display:flex;flex-wrap:wrap;gap:6px;padding:12px 20px;background:#fff;border-bottom:1px solid #e2e8f0}
+.legend-compact .leg-item{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;color:#475569}
+.legend-compact .leg-swatch{width:18px;height:14px;border-radius:3px;display:inline-block;text-align:center;font-size:.6rem;line-height:14px;font-weight:700}
+
+.empty-state{text-align:center;padding:60px 20px;color:#94a3b8}
+.empty-state .icon{font-size:3rem;margin-bottom:12px}
+.empty-state h2{font-size:1.1rem;color:#64748b;margin-bottom:8px}
+.empty-state p{font-size:.88rem}
+
+.loading-bar{padding:16px 20px;text-align:center;color:#d97706;font-size:.9rem;font-weight:600}
+</style>
+</head>
+<body>
+<script>
+document.addEventListener('gesturestart',function(e){e.preventDefault();});
+document.addEventListener('gesturechange',function(e){e.preventDefault();});
+document.addEventListener('gestureend',function(e){e.preventDefault();});
+document.addEventListener('touchmove',function(e){if(e.touches.length>1){e.preventDefault();}},{passive:false});
+var lastTouchEnd=0;
+document.addEventListener('touchend',function(e){var now=Date.now();if(now-lastTouchEnd<=300){e.preventDefault();}lastTouchEnd=now;},false);
+</script>
+
+<div class="header">
+<div class="header-left">LIN8</div>
+<div class="header-center"><h1>I Miei Turni</h1></div>
+<div class="header-right" id="headerDateInfo"></div>
+</div>
+<script>
+(function(){
+var now=new Date();
+var days=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+var months=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+var el=document.getElementById('headerDateInfo');
+if(el)el.innerHTML='<div class="hdr-day">'+days[now.getDay()]+' '+now.getDate()+' '+months[now.getMonth()]+'</div>';
+})();
+</script>
+
+<div class="loading-bar" id="loadingBar">&#9203; Caricamento calendario...</div>
+
+<div class="login-section" id="loginSection" style="display:none">
+<div style="display:flex;align-items:center;gap:10px">
+<select class="login-select" id="loginSelect" onchange="onLoginChange()" style="flex:1">
+<option value="">— Scegli il tuo login —</option>
+</select>
+<span style="position:relative;display:inline-flex;align-items:center;flex-shrink:0;width:44px;height:44px">
+<span style="width:44px;height:44px;border-radius:10px;border:2px solid #e2e8f0;background:#fff;font-size:1.2rem;display:flex;align-items:center;justify-content:center;pointer-events:none">&#128101;</span>
+<input type="date" id="whoDatePicker" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer" onchange="showWhoIsWorking()">
+</span>
+<button class="dark-toggle" id="darkToggle" onclick="toggleDark()" title="Modalità scura">&#127769;</button>
+</div>
+</div>
+
+<div class="tech-info-bar" id="techInfoBar">
+<span class="tech-name" id="techName"></span>
+<span class="tech-team" id="techTeam"></span>
+</div>
+
+<div class="legend-compact" id="legendBar" style="display:none">
+<span class="leg-item"><span class="leg-swatch s-M">M</span>Mattina</span>
+<span class="leg-item"><span class="leg-swatch s-P">P</span>Pomeriggio</span>
+<span class="leg-item"><span class="leg-swatch s-N">N</span>Notte</span>
+<span class="leg-item"><span class="leg-swatch s-C">C</span>Centrale</span>
+<span class="leg-item"><span class="leg-swatch s-F">F</span>Ferie</span>
+<span class="leg-item"><span class="leg-swatch s-T">T</span>Training</span>
+<span class="leg-item"><span class="leg-swatch s-MAL">MAL</span>Malattia</span>
+<span class="leg-item"><span class="leg-swatch s-TRAS">TRA</span>Trasferta</span>
+</div>
+
+<div class="calendar-container" id="calendarArea">
+<div class="empty-state"><div class="icon">&#128197;</div><h2>Seleziona il tuo login</h2><p>Vedrai il tuo calendario personale</p></div>
+</div>
+<div class="note-popup" id="notePopup">
+<div class="note-header"><span class="note-date" id="noteDate"></span><button class="note-close" onclick="closeNote()">&#10005;</button></div>
+<div class="note-text" id="noteText"></div>
+</div>
+<div class="note-popup" id="whoPopup" style="max-height:70vh;overflow-y:auto">
+<div class="note-header"><span class="note-date" id="whoDate"></span><button class="note-close" onclick="closeWho()">&#10005;</button></div>
+<div id="whoContent"></div>
+</div>
+
+<script>
+var DATA={employees:[],dates:[],weeks:[]};
+var IT_MONTHS=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+var IT_MONTHS_SHORT={gen:0,feb:1,mar:2,apr:3,mag:4,giu:5,lug:6,ago:7,set:8,ott:9,nov:10,dic:11,jan:0,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,dec:11};
+var PREFS_KEY='turni2026_mobile_login';
+
+function parseExcelDate(v){
+if(v instanceof Date)return v;
+if(typeof v==='number'&&v>40000&&v<60000)return new Date((v-25569)*86400000);
+if(typeof v==='string'){
+v=v.trim();
+var m=v.match(/^(\d{1,2})[\-\/]([a-zA-Z]{3,})$/);
+if(m){var day=parseInt(m[1]);var mon=IT_MONTHS_SHORT[m[2].toLowerCase().substring(0,3)];if(mon!==undefined)return new Date(2026,mon,day);}
+m=v.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{2,4})$/);
+if(m)return new Date(parseInt(m[3])<100?2000+parseInt(m[3]):parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));
+}
+return null;
+}
+
+function classifyShift(val){
+if(!val||val==='')return{cls:'',display:'',type:'empty'};
+var v=val.toUpperCase().trim();
+if(v==='M')return{cls:'s-M',display:'M',type:'M'};
+if(v==='P')return{cls:'s-P',display:'P',type:'P'};
+if(v==='N')return{cls:'s-N',display:'N',type:'N'};
+if(v==='C')return{cls:'s-C',display:'C',type:'C'};
+if(v==='F')return{cls:'s-F',display:'F',type:'F'};
+if(v==='T')return{cls:'s-T',display:'T',type:'T'};
+if(v.indexOf('MALATTIA')>=0)return{cls:'s-MAL',display:'MAL',type:'MAL'};
+if(v.indexOf('TRASFERTA')>=0)return{cls:'s-TRAS',display:'TRA',type:'TRAS'};
+var tm=val.match(/(\d{1,2})[:.]?(\d{2})?\s*[-\u2013]\s*(\d{1,2})/);
+if(tm){var hh=parseInt(tm[1]);var disp=val;if(hh>=5&&hh<=7)return{cls:'s-M',display:disp,type:'M'};if(hh>=8&&hh<=9)return{cls:'s-C',display:disp,type:'C'};if(hh>=10&&hh<=15)return{cls:'s-P',display:disp,type:'P'};return{cls:'s-N',display:disp,type:'N'};}
+return{cls:'',display:val,type:'other'};
+}
+
+function isoDate(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+
+document.addEventListener('DOMContentLoaded',function(){
+fetch('Turni%202026.xlsx?t='+Date.now()).then(function(resp){
+if(!resp.ok)throw new Error('HTTP '+resp.status);
+return resp.arrayBuffer();
+}).then(function(buf){
+var data=new Uint8Array(buf);
+var wb=XLSX.read(data,{type:'array',cellDates:false});
+var sheet=wb.Sheets[wb.SheetNames[0]];
+// Extract comments
+var comments={};
+var cellKeys=Object.keys(sheet);
+for(var k=0;k<cellKeys.length;k++){
+var cellKey=cellKeys[k];
+if(cellKey.charAt(0)==='!')continue;
+var cellObj=sheet[cellKey];
+if(cellObj&&cellObj.c&&cellObj.c.length>0){
+var commentTexts=[];
+for(var ci=0;ci<cellObj.c.length;ci++){if(cellObj.c[ci].t)commentTexts.push(cellObj.c[ci].t.trim());}
+if(commentTexts.length>0)comments[cellKey]=commentTexts.join(' | ');
+}
+}
+var raw=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
+parseData(raw,comments);
+}).catch(function(err){
+console.error(err);
+document.getElementById('loadingBar').innerHTML='&#9888;&#65039; Errore caricamento. <button onclick="location.reload()" style="margin-left:8px;padding:6px 12px;border-radius:6px;border:none;background:#ff9900;color:#fff;font-weight:600;cursor:pointer">Riprova</button>';
+});
+});
+
+function colToLetter(c){var s='';c++;while(c>0){c--;s=String.fromCharCode(65+(c%26))+s;c=Math.floor(c/26);}return s;}
+function cellAddr(r,c){return colToLetter(c)+String(r+1);}
+
+function parseData(raw,comments){
+if(raw.length<4)return;
+var weekRow=raw[0],dateRow=raw[1],dayRow=raw[2];
+var startCol=4;
+for(var c=4;c<dateRow.length;c++){if(dateRow[c]!==''&&dateRow[c]!==null&&dateRow[c]!==undefined){if(parseExcelDate(dateRow[c])){startCol=c;break;}}}
+var dates=[];
+for(var c=startCol;c<dateRow.length;c++){
+var dt=parseExcelDate(dateRow[c]);
+if(!dt){if(dates.length>0)dt=new Date(dates[dates.length-1].getTime()+86400000);else continue;}
+dates.push(dt);
+}
+var employees=[],allLogins=[];
+var SKIP_ROWS=['planning','legenda','totale','riepilogo','summary','total','note'];
+for(var r=3;r<raw.length;r++){
+var row=raw[r];if(!row||row.length<4)continue;
+var roleRaw=String(row[0]||'').trim(),teamRaw=String(row[1]||'').trim(),tech=String(row[2]||'').trim(),login=String(row[3]||'').trim();
+if(!login||login.length<2)continue;if(!teamRaw&&!tech)continue;
+var skipTest=(roleRaw+' '+teamRaw+' '+tech+' '+login).toLowerCase();
+var skip=false;for(var s=0;s<SKIP_ROWS.length;s++){if(skipTest.indexOf(SKIP_ROWS[s])>=0){skip=true;break;}}
+if(skip)continue;
+var shifts=[],notes=[];
+for(var c=startCol;c<startCol+dates.length;c++){
+shifts.push((c<row.length&&row[c]!=null)?String(row[c]).trim():'');
+var addr=cellAddr(r,c);
+notes.push(comments[addr]||'');
+}
+employees.push({team:teamRaw,tech:tech,login:login,shifts:shifts,notes:notes});
+allLogins.push(login);
+}
+DATA={employees:employees,dates:dates};
+allLogins.sort();
+document.getElementById('loadingBar').style.display='none';
+document.getElementById('loginSection').style.display='';
+var sel=document.getElementById('loginSelect');
+sel.innerHTML='<option value="">— Scegli il tuo login —</option>';
+allLogins.forEach(function(l){var o=document.createElement('option');o.value=l;o.textContent=l;sel.appendChild(o);});
+var saved=localStorage.getItem(PREFS_KEY);
+if(saved&&allLogins.indexOf(saved)>=0){sel.value=saved;onLoginChange();}
+}
+
+function onLoginChange(){
+var login=document.getElementById('loginSelect').value;
+if(!login){
+document.getElementById('techInfoBar').classList.remove('show');
+document.getElementById('legendBar').style.display='none';
+document.getElementById('calendarArea').innerHTML='<div class="empty-state"><div class="icon">&#128197;</div><h2>Seleziona il tuo login</h2><p>Vedrai il tuo calendario personale</p></div>';
+return;
+}
+localStorage.setItem(PREFS_KEY,login);
+var emp=null;
+for(var i=0;i<DATA.employees.length;i++){if(DATA.employees[i].login===login){emp=DATA.employees[i];break;}}
+if(!emp)return;
+document.getElementById('techName').textContent=emp.tech;
+document.getElementById('techTeam').textContent='Team '+emp.team;
+document.getElementById('techInfoBar').classList.add('show');
+document.getElementById('legendBar').style.display='flex';
+renderCalendar(emp);
+}
+
+var _currentMonth=new Date().getMonth();
+var _currentYear=new Date().getFullYear();
+var _currentEmp=null;
+
+function renderCalendar(emp){
+_currentEmp=emp;
+_currentMonth=new Date().getMonth();
+_currentYear=new Date().getFullYear();
+renderMonth();
+}
+
+function renderMonth(){
+var emp=_currentEmp;
+if(!emp)return;
+var today=new Date();
+var todayStr=isoDate(today);
+
+// Build shift lookup for this month
+var shiftMap={};
+var noteMap={};
+for(var i=0;i<DATA.dates.length;i++){
+var d=DATA.dates[i];
+if(d.getMonth()===_currentMonth&&d.getFullYear()===_currentYear){
+shiftMap[d.getDate()]=emp.shifts[i]||'';
+if(emp.notes&&emp.notes[i])noteMap[d.getDate()]=emp.notes[i];
+}
+}
+
+var daysInMonth=new Date(_currentYear,_currentMonth+1,0).getDate();
+
+var html='<div class="month-block">';
+html+='<div class="month-header">';
+html+='<button class="month-nav" onclick="prevMonth()">&#9664;</button>';
+html+='<span class="month-title" onclick="goToCurrentMonth()">'+IT_MONTHS[_currentMonth]+' '+_currentYear+'</span>';
+html+='<button class="month-nav" onclick="nextMonth()">&#9654;</button>';
+html+='</div>';
+html+='<div class="cal-grid">';
+
+var dayHeaders=['D','L','M','M','G','V','S'];
+html+='<div class="cal-wk"></div>';
+for(var dh=0;dh<7;dh++){html+='<div class="cal-day-header">'+dayHeaders[dh]+'</div>';}
+
+// Calculate week number
+function getWeekNum(d){var tmp=new Date(d.getFullYear(),d.getMonth(),d.getDate());tmp.setDate(tmp.getDate()+3-(tmp.getDay()+6)%7);var wk1=new Date(tmp.getFullYear(),0,4);return 1+Math.round(((tmp-wk1)/86400000-(tmp.getDay()+6)%7+(wk1.getDay()+6)%7)/7);}
+
+// First day of month (0=Sunday)
+var firstDay=new Date(_currentYear,_currentMonth,1).getDay();
+
+// Empty cells before first day (week starts on Sunday)
+var firstWeekNum=getWeekNum(new Date(_currentYear,_currentMonth,1));
+html+='<div class="cal-wk">'+firstWeekNum+'</div>';
+for(var e=0;e<firstDay;e++){html+='<div class="cal-day empty"></div>';}
+
+var currentDayOfWeek=firstDay;
+for(var day=1;day<=daysInMonth;day++){
+if(day>1&&currentDayOfWeek===0){
+var wkNum=getWeekNum(new Date(_currentYear,_currentMonth,day));
+html+='<div class="cal-wk">'+wkNum+'</div>';
+}
+var dt=new Date(_currentYear,_currentMonth,day);
+var isToday=isoDate(dt)===todayStr;
+var isWeekend=dt.getDay()===0||dt.getDay()===6;
+var shift=shiftMap[day]||'';
+var note=noteMap[day]||'';
+var sh=classifyShift(shift);
+var cls='cal-day';
+if(isToday)cls+=' today';
+if(isWeekend)cls+=' weekend';
+if(sh.type!=='empty')cls+=' has-shift';
+
+html+='<div class="'+cls+'" '+(note?'onclick="showNote(\''+day+' '+IT_MONTHS[_currentMonth]+'\',\''+note.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')"':'')+'>';
+html+='<div class="day-num">'+day+'</div>';
+if(sh.type!=='empty'){
+var isLong=sh.display.length>2;
+html+='<span class="shift-badge '+sh.cls+(isLong?' small-text':'')+'">'+sh.display+'</span>';
+}else{
+html+='<span class="shift-badge" style="visibility:hidden">-</span>';
+}
+if(note)html+='<span class="note-indicator"></span>';
+html+='</div>';
+currentDayOfWeek++;
+if(currentDayOfWeek>6)currentDayOfWeek=0;
+}
+
+var lastDay=new Date(_currentYear,_currentMonth,daysInMonth).getDay();
+for(var e=lastDay;e<6;e++){html+='<div class="cal-day empty"></div>';}
+
+html+='</div></div>';
+document.getElementById('calendarArea').innerHTML=html;
+}
+
+function prevMonth(){
+_currentMonth--;
+if(_currentMonth<0){_currentMonth=11;_currentYear--;}
+renderMonth();
+}
+function nextMonth(){
+_currentMonth++;
+if(_currentMonth>11){_currentMonth=0;_currentYear++;}
+renderMonth();
+}
+function goToCurrentMonth(){
+_currentMonth=new Date().getMonth();
+_currentYear=new Date().getFullYear();
+renderMonth();
+}
+
+function showNote(date,text){
+document.getElementById('noteDate').textContent=date;
+document.getElementById('noteText').textContent=text;
+document.getElementById('notePopup').classList.add('show');
+}
+function closeNote(){
+document.getElementById('notePopup').classList.remove('show');
+}
+
+function showWhoIsWorking(){
+var val=document.getElementById('whoDatePicker').value;
+if(!val)return;
+var targetDate=new Date(val+'T00:00:00');
+var targetStr=val;
+var dayIdx=-1;
+for(var i=0;i<DATA.dates.length;i++){if(isoDate(DATA.dates[i])===targetStr){dayIdx=i;break;}}
+if(dayIdx<0){alert('Data non trovata nel calendario');return;}
+var days=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+var dateLabel=days[targetDate.getDay()]+' '+('0'+targetDate.getDate()).slice(-2)+'/'+('0'+(targetDate.getMonth()+1)).slice(-2);
+var shifts={M:[],P:[],N:[],C:[],F:[],MAL:[],TRAS:[],T:[],other:[]};
+DATA.employees.forEach(function(emp){
+var val2=dayIdx<emp.shifts.length?emp.shifts[dayIdx]:'';
+if(!val2)return;
+var v=val2.toUpperCase().trim();
+if(v==='M')shifts.M.push(emp.tech);
+else if(v==='P')shifts.P.push(emp.tech);
+else if(v==='N')shifts.N.push(emp.tech);
+else if(v==='C')shifts.C.push(emp.tech);
+else if(v==='F')shifts.F.push(emp.tech);
+else if(v==='T')shifts.T.push(emp.tech);
+else if(v.indexOf('MALATTIA')>=0)shifts.MAL.push(emp.tech);
+else if(v.indexOf('TRASFERTA')>=0)shifts.TRAS.push(emp.tech);
+else{
+var tm=val2.match(/(\d{1,2})[:.]?(\d{2})?\s*[-\u2013]\s*(\d{1,2})/);
+if(tm){var hh=parseInt(tm[1]);var hh2=parseInt(tm[3]);
+var isStandardM=(hh===6&&hh2===14);
+var isStandardP=(hh===14&&hh2===22);
+var isStandardN=(hh===22&&hh2===6);
+if(hh>=5&&hh<=9){shifts.M.push(isStandardM?emp.tech:emp.tech+' ('+val2+')');}
+else if(hh>=10&&hh<=17){shifts.P.push(isStandardP?emp.tech:emp.tech+' ('+val2+')');}
+else{shifts.N.push(isStandardN?emp.tech:emp.tech+' ('+val2+')');}
+}else{shifts.other.push(emp.tech+' ('+val2+')');}
+}
+});
+var html='';
+if(shifts.M.length){html+='<div style="margin-bottom:12px"><div style="font-weight:700;color:#1b5e20;background:#c6efce;display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:4px;font-size:.8rem">Mattina ('+shifts.M.length+')</div><div style="font-size:.85rem;color:#475569;line-height:1.8">'+shifts.M.join(', ')+'</div></div>';}
+if(shifts.P.length){html+='<div style="margin-bottom:12px"><div style="font-weight:700;color:#7c5e00;background:#fff2cc;display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:4px;font-size:.8rem">Pomeriggio ('+shifts.P.length+')</div><div style="font-size:.85rem;color:#475569;line-height:1.8">'+shifts.P.join(', ')+'</div></div>';}
+if(shifts.N.length){html+='<div style="margin-bottom:12px"><div style="font-weight:700;color:#0d47a1;background:#bdd7ee;display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:4px;font-size:.8rem">Notte ('+shifts.N.length+')</div><div style="font-size:.85rem;color:#475569;line-height:1.8">'+shifts.N.join(', ')+'</div></div>';}
+if(shifts.C.length){html+='<div style="margin-bottom:12px"><div style="font-weight:700;color:#424242;background:#d9d9d9;display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:4px;font-size:.8rem">Centrale ('+shifts.C.length+')</div><div style="font-size:.85rem;color:#475569;line-height:1.8">'+shifts.C.join(', ')+'</div></div>';}
+if(shifts.F.length){html+='<div style="margin-bottom:12px"><div style="font-weight:700;color:#b71c1c;background:#ffc7ce;display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:4px;font-size:.8rem">Ferie ('+shifts.F.length+')</div><div style="font-size:.85rem;color:#475569;line-height:1.8">'+shifts.F.join(', ')+'</div></div>';}
+if(shifts.MAL.length){html+='<div style="margin-bottom:12px"><div style="font-weight:700;color:#880e4f;background:#f8bbd0;display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:4px;font-size:.8rem">Malattia ('+shifts.MAL.length+')</div><div style="font-size:.85rem;color:#475569;line-height:1.8">'+shifts.MAL.join(', ')+'</div></div>';}
+if(shifts.TRAS.length){html+='<div style="margin-bottom:12px"><div style="font-weight:700;color:#4a148c;background:#e1bee7;display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:4px;font-size:.8rem">Trasferta ('+shifts.TRAS.length+')</div><div style="font-size:.85rem;color:#475569;line-height:1.8">'+shifts.TRAS.join(', ')+'</div></div>';}
+if(shifts.T.length){html+='<div style="margin-bottom:12px"><div style="font-weight:700;color:#795548;background:#fff9c4;display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:4px;font-size:.8rem">Training ('+shifts.T.length+')</div><div style="font-size:.85rem;color:#475569;line-height:1.8">'+shifts.T.join(', ')+'</div></div>';}
+if(shifts.other.length){html+='<div style="margin-bottom:12px"><div style="font-weight:700;color:#475569;background:#f1f5f9;display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:4px;font-size:.8rem">Altro ('+shifts.other.length+')</div><div style="font-size:.85rem;color:#475569;line-height:1.8">'+shifts.other.join(', ')+'</div></div>';}
+if(!html)html='<p style="color:#94a3b8;text-align:center">Nessuno in turno</p>';
+document.getElementById('whoDate').textContent=dateLabel;
+document.getElementById('whoContent').innerHTML=html;
+document.getElementById('whoPopup').classList.add('show');
+}
+function closeWho(){
+document.getElementById('whoPopup').classList.remove('show');
+}
+
+function toggleDark(){
+document.body.classList.toggle('dark');
+var isDark=document.body.classList.contains('dark');
+localStorage.setItem('turni_dark_mode',isDark?'1':'0');
+document.getElementById('darkToggle').textContent=isDark?'☀️':'🌙';
+}
+// Restore dark mode preference
+(function(){
+if(localStorage.getItem('turni_dark_mode')==='1'){
+document.body.classList.add('dark');
+var btn=document.getElementById('darkToggle');
+if(btn)btn.textContent='☀️';
+}
+})();
+
+// Swipe support
+var _touchStartX=0;
+document.addEventListener('touchstart',function(e){_touchStartX=e.touches[0].clientX;});
+document.addEventListener('touchend',function(e){
+var diff=e.changedTouches[0].clientX-_touchStartX;
+if(Math.abs(diff)>60){
+if(diff<0)nextMonth();
+else prevMonth();
+}
+});
+</script>
+</body>
+</html>
